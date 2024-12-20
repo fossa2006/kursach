@@ -5,6 +5,7 @@ from tkinter import messagebox
 from Userlogin import Login
 from Admin_menu import Admin
 from User_menu import User
+import pandas as pd  # Для экспорта данных в Excel
 
 # ОСНОВНОЕ ОКНО
 class Main(Login, Admin, User):
@@ -85,6 +86,10 @@ class Main(Login, Admin, User):
         self.en_button = Button(self.topframe, text="EN", command=lambda: self.change_language('en'))
         self.en_button.place(x=1250, y=10)
 
+        # Добавляем кнопку "Экспорт в Excel"
+        self.export_excel_button = Button(self.topframe, text="Экспорт в Excel", command=self.export_to_excel)
+        self.export_excel_button.place(x=1050, y=10)  # Укажите подходящее место для кнопки
+
     def change_language(self, lang):
         self.current_language = lang
         self.translate_interface()
@@ -99,7 +104,7 @@ class Main(Login, Admin, User):
                 'добавить': 'добавить',
                 'Инвентаризация': 'Инвентаризация',
                 'Траты': 'Траты',
-                'Поиск по Описанию': 'Поиск по Описанию',
+                'Поиск': 'Поиск',
                 'Сбросить': 'Сбросить',
                 'Обновить': 'Обновить',
                 'Удалить': 'Удалить',
@@ -163,7 +168,7 @@ class Main(Login, Admin, User):
                 'добавить': 'Add',
                 'Инвентаризация': 'Inventory',
                 'Траты': 'Expenses',
-                'Поиск по Описанию': 'Search by Description',
+                'Поиск': 'Search',
                 'Сбросить': 'Reset',
                 'Обновить': 'Update',
                 'Удалить': 'Delete',
@@ -268,6 +273,31 @@ class Main(Login, Admin, User):
         for j in saleslist:
             if self.searchvar.get().lower() in j[3].lower():  # Проверяем совпадение по описанию
                 self.tree.insert('', 'end', values=(j))
+
+    def export_to_excel(self):
+
+        try:
+            # Получаем данные из таблицы products
+            self.cur.execute("SELECT * FROM products")
+            products = self.cur.fetchall()
+
+            # Если данных нет, выводим сообщение
+            if not products:
+                messagebox.showinfo("Информация", "Нет данных для экспорта")
+                return
+
+            # Создаем DataFrame из данных
+            columns = ["Product ID", "Product Name", "Description", "Category", "Price", "Stocks"]
+            df = pd.DataFrame(products, columns=columns)
+
+            # Сохраняем DataFrame в Excel
+            file_path = "products_export.xlsx"
+            df.to_excel(file_path, index=False)
+
+            messagebox.showinfo("Успешно", f"Данные успешно экспортированы в файл: {file_path}")
+
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Ошибка при экспорте данных: {e}")
 
 
 if __name__ == '__main__':

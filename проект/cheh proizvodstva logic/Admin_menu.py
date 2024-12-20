@@ -7,7 +7,7 @@ from tkinter import *
 from tkinter import messagebox, simpledialog
 from Addtional_features import mycombobox, myentry
 import matplotlib
-
+import pandas as pd
 from tkcalendar import DateEntry
 
 matplotlib.use('TkAgg')  # Устанавливаем бэкенд TkAgg для интеграции с Tkinter
@@ -23,6 +23,32 @@ class Admin:
         self.cur.execute("ALTER TABLE sales ADD COLUMN username VARCHAR(20)")  # Добавляем поле username в таблицу sales
         self.base.commit()
 
+    def export_to_excel(self):
+        """
+        Экспорт данных из таблицы products в Excel.
+        """
+        try:
+            # Получаем данные из таблицы products
+            self.cur.execute("SELECT * FROM products")
+            products = self.cur.fetchall()
+
+            # Если данных нет, выводим сообщение
+            if not products:
+                messagebox.showinfo("Информация", "Нет данных для экспорта")
+                return
+
+            # Создаем DataFrame из данных
+            columns = ["Product ID", "Product Name", "Description", "Category", "Price", "Stocks"]
+            df = pd.DataFrame(products, columns=columns)
+
+            # Сохраняем DataFrame в Excel
+            file_path = "products_export.xlsx"
+            df.to_excel(file_path, index=False)
+
+            messagebox.showinfo("Успешно", f"Данные успешно экспортированы в файл: {file_path}")
+
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Ошибка при экспорте данных: {e}")
     # ДОБАВЛЕНИЕ ОСНОВНОГО МЕНЮ АДМИНИСТРАТОРА В ОКНО, ВСЕ ФРЕЙМЫ И КНОПКИ С ИЗОБРАЖЕНИЯМИ
     def admin_mainmenu(self, a, b):
         self.mainframe = LabelFrame(self.mainw, width=1200, height=145, bg="#f7f7f7")
@@ -89,7 +115,7 @@ class Admin:
         self.searchframe = Frame(self.mainw, width=720, height=70, bg="#FFFFFF")
         self.searchframe.place(x=575, y=260)
         self.searchframeinfo = self.searchframe.place_info()
-        self.searchbut = Button(self.searchframe, text="Поиск по Описанию", font="roboto 14", bg="#FFFFFF", bd=5,
+        self.searchbut = Button(self.searchframe, text="Поиск", font="roboto 14", bg="#FFFFFF", bd=5,
                                 command=self.searchprod)
         self.searchbut.place(x=0, y=20, height=40)
         self.searchvar = StringVar()
@@ -395,7 +421,7 @@ class Admin:
         if (f == 1):
             self.searchframe.config(width=720)
             self.searchframe.place(x=575, y=245)
-            self.searchbut.config(text="Поиск по Описанию", command=self.searchprod)
+            self.searchbut.config(text="Поиск", command=self.searchprod)
             self.searchbut.place(x=0, y=23, height=37)
             self.searchentry.config(textvariable=self.searchvar, width=20)
             self.searchentry.place(x=210, y=25, height=35)
@@ -428,7 +454,7 @@ class Admin:
             self.searchframe.config(width=520)
             self.searchbut.config(command=self.searchinvoice)
             self.searchbut.config(text="Поиск")  # Переименование кнопки
-            self.searchbut.place(x=0, y=23)
+            self.searchbut.place(x=100, y=23)
             self.searchentry.config(width=18, textvariable=self.searchvar)
             self.searchentry.place(x=195, y=25, height=35)
             self.resetbut.config(command=self.buildsalestable)
@@ -527,15 +553,77 @@ class Admin:
             self.itemeditpricev.set('')
 
     def searchprod(self):
-        if (self.searchvar.get() == ''):
-            return
-        self.tree.delete(*self.tree.get_children())
-        self.cur.execute("select * from products")
-        li = self.cur.fetchall()
-        for i in li:
-            if (i[2] == self.searchvar.get()):
-                self.tree.insert('', 'end', values=(i))
+        # Создаем новое окно для поиска
+        self.search_window = Toplevel(self.mainw)
+        self.search_window.title("Результаты поиска")
+        self.search_window.geometry("800x600")
 
+        # Переменные для хранения значений полей ввода
+        self.search_product_id = StringVar()
+        self.search_description = StringVar()
+
+        # Создаем поля ввода для параметров поиска
+        Label(self.search_window, text="ID продукта:").grid(row=0, column=0, padx=10, pady=5)
+        Entry(self.search_window, textvariable=self.search_product_id).grid(row=0, column=1, padx=10, pady=5)
+
+        Label(self.search_window, text="Описание:").grid(row=1, column=0, padx=10, pady=5)
+        Entry(self.search_window, textvariable=self.search_description).grid(row=1, column=1, padx=10, pady=5)
+
+        # Кнопка для выполнения поиска
+        Button(self.search_window, text="Поиск", command=self.perform_search).grid(row=2, column=0, columnspan=2, pady=10)
+
+        # Создаем таблицу для отображения результатов
+        self.result_tree = ttk.Treeview(self.search_window, columns=("Product ID", "Product Name", "Description", "Category", 'Price', 'Stocks'),
+                                        selectmode="browse", height=18)
+        self.result_tree.column('#0', stretch=NO, minwidth=0, width=0)
+        self.result_tree.column('#1', stretch=NO, minwidth=0, width=100)
+        self.result_tree.column('#2', stretch=NO, minwidth=0, width=150)
+        self.result_tree.column('#3', stretch=NO, minwidth=0, width=150)
+        self.result_tree.column('#4', stretch=NO, minwidth=0, width=100)
+        self.result_tree.column('#5', stretch=NO, minwidth=0, width=100)
+        self.result_tree.heading('Product ID', text="id продукта", anchor=W)
+        self.result_tree.heading('Product Name', text="Имя продукта", anchor=W)
+        self.result_tree.heading('Description', text="Описание", anchor=W)
+        self.result_tree.heading('Category', text="Категория", anchor=W)
+        self.result_tree.heading('Price', text="Цена", anchor=W)
+        self.result_tree.heading('Stocks', text="Остаток", anchor=W)
+        self.result_tree.grid(row=3, column=0, columnspan=2, sticky="nsew")
+
+        # Добавляем скроллбары
+        scrollbary = Scrollbar(self.search_window, orient=VERTICAL, command=self.result_tree.yview)
+        scrollbary.grid(row=3, column=2, sticky="ns")
+        self.result_tree.configure(yscrollcommand=scrollbary.set)
+
+    def perform_search(self):
+        # Получаем значения из полей ввода
+        product_id = self.search_product_id.get()
+        description = self.search_description.get()
+
+        # Формируем SQL-запрос с учетом введенных параметров
+        query = """
+            SELECT product_id, product_name, product_desc, product_cat, product_price, stocks
+            FROM products
+            WHERE 1=1
+        """
+        params = []
+
+        if product_id:
+            query += " AND product_id = ?"
+            params.append(product_id)
+        if description:
+            query += " AND product_desc LIKE ?"
+            params.append('%' + description + '%')
+
+        # Выполняем запрос
+        self.cur.execute(query, tuple(params))
+        productlist = self.cur.fetchall()
+
+        # Очищаем текущую таблицу результатов
+        self.result_tree.delete(*self.result_tree.get_children())
+
+        # Заполняем таблицу результатами поиска
+        for product in productlist:
+            self.result_tree.insert('', 'end', values=(product))
     def resetprodtabel(self):
         self.searchvar.set('')
         self.tree.delete(*self.tree.get_children())
@@ -826,19 +914,17 @@ class Admin:
         self.tree.destroy()
         scrollbarx = Scrollbar(self.tableframe1, orient=HORIZONTAL)
         scrollbary = Scrollbar(self.tableframe1, orient=VERTICAL)
-        self.tree = ttk.Treeview(self.tableframe1, columns=("Username", "Invoice No.", "Product ID", "Description",
+        self.tree = ttk.Treeview(self.tableframe1, columns=("Invoice No.", "Product ID", "Description",
                                                             'Quantity', 'Total Price', 'Date', 'Time'),
                                  selectmode="browse", height=16,
                                  yscrollcommand=scrollbary.set, xscrollcommand=scrollbarx.set)
         self.tree.column('#0', stretch=NO, minwidth=0, width=0)
         self.tree.column('#1', stretch=NO, minwidth=0, width=140)
-        self.tree.column('#2', stretch=NO, minwidth=0, width=140)
-        self.tree.column('#3', stretch=NO, minwidth=0, width=150)
-        self.tree.column('#4', stretch=NO, minwidth=0, width=170)
+        self.tree.column('#2', stretch=NO, minwidth=0, width=150)
+        self.tree.column('#3', stretch=NO, minwidth=0, width=170)
+        self.tree.column('#4', stretch=NO, minwidth=0, width=130)
         self.tree.column('#5', stretch=NO, minwidth=0, width=130)
         self.tree.column('#6', stretch=NO, minwidth=0, width=130)
-        self.tree.column('#7', stretch=NO, minwidth=0, width=130)
-        self.tree.heading('Username', text="Имя пользователя", anchor=W)
         self.tree.heading('Invoice No.', text="Счёт-фактура", anchor=W)
         self.tree.heading('Product ID', text="id продукта", anchor=W)
         self.tree.heading('Description', text="Описание", anchor=W)
@@ -860,16 +946,13 @@ class Admin:
         self.getsales()
         self.mainsearch(2)
 
-        # Добавляем кнопки для поиска по периоду и по описанию
-        Button(self.searchframe, text="Поиск по периоду", command=self.search_by_date_range).place(x=0, y=60)
-        Button(self.searchframe, text="Поиск по описанию", command=self.search_by_description).place(x=120, y=60)
     def getsales(self):
-        self.cur.execute("select * from sales")
+        self.cur.execute("SELECT * FROM sales")
         saleslist = self.cur.fetchall()
         for i in range(0, len(saleslist)):
             saleslist[i] = list(saleslist[i])
             # Получаем описание и цену продукта
-            self.cur.execute("select product_desc, product_price from products where product_id=?",
+            self.cur.execute("SELECT product_desc, product_price FROM products WHERE product_id=?",
                              (int(saleslist[i][2]),))
             l = self.cur.fetchall()
             if l:  # Проверяем, есть ли результаты запроса
@@ -882,15 +965,8 @@ class Admin:
             s = (str(saleslist[i][4])).split('-')
             saleslist[i][4] = s[2] + " - " + s[1] + " - " + s[0]
 
-            # Проверяем, есть ли столбец username
-            if len(saleslist[i]) > 6:
-                username = saleslist[i][6]  # Получаем username, если он есть
-            else:
-                username = "Unknown"  # Если username отсутствует, используем значение по умолчанию
-
             # Формируем строку для таблицы
             saleslist[i] = [
-                saleslist[i][0],  # Username
                 saleslist[i][1],  # Invoice No.
                 saleslist[i][2],  # Product ID
                 product_desc,  # Description
@@ -898,7 +974,6 @@ class Admin:
                 product_price * (int(saleslist[i][3])),  # Total Price
                 saleslist[i][4],  # Date
                 saleslist[i][5],  # Time
-                username  # Username
             ]
 
             saleslist[i] = tuple(saleslist[i])
@@ -913,16 +988,98 @@ class Admin:
         # Считаем общую сумму всех "Общ цена"
         total_sales = 0
         for item in self.tree.get_children():
-            total_sales += float(self.tree.item(item, 'values')[5])  # Индекс 5 - это "Общ цена"
+            try:
+                # Индекс 5 - это "Общ цена"
+                total_sales += float(self.tree.item(item, 'values')[5])
+            except ValueError:
+                # Если не удалось преобразовать в float, пропускаем это значение
+                continue
 
         # Обновляем текст метки с общей суммой
         self.total_sales_label.config(text=f"Общая сумма: {total_sales}")
 
     def searchinvoice(self):
-        if (self.searchvar.get() == ''):
+        # Открываем новое окно для поиска
+        self.search_window = Toplevel(self.mainw)
+        self.search_window.title("Поиск по параметрам")
+        self.search_window.geometry("400x300")
+
+        # Переменные для хранения значений полей ввода
+        self.search_invoice = StringVar()
+        self.search_product_id = StringVar()
+        self.search_description = StringVar()  # Переменная для описания
+
+        # Создаем поля ввода для параметров поиска
+        Label(self.search_window, text="Номер счета:").grid(row=0, column=0, padx=10, pady=5)
+        Entry(self.search_window, textvariable=self.search_invoice).grid(row=0, column=1, padx=10, pady=5)
+
+        Label(self.search_window, text="ID продукта:").grid(row=1, column=0, padx=10, pady=5)
+        Entry(self.search_window, textvariable=self.search_product_id).grid(row=1, column=1, padx=10, pady=5)
+
+        Label(self.search_window, text="Описание:").grid(row=2, column=0, padx=10, pady=5)  # Поле для описания
+        search_entry = myentry(self.search_window, textvariable=self.search_description, font="roboto 12", width=20)
+        search_entry.grid(row=2, column=1, padx=10, pady=5)
+
+        # Получаем список описаний из таблицы products
+        self.cur.execute("SELECT DISTINCT product_desc FROM products")
+        descriptions = [desc[0] for desc in self.cur.fetchall()]
+
+        # Устанавливаем список автозаполнения для поля описания
+        search_entry.set_completion_list(descriptions)
+
+        # Кнопка для выполнения поиска
+        Button(self.search_window, text="Поиск", command=self.perform_search).grid(row=3, column=0, columnspan=2,
+                                                                                   pady=10)
+
+    def perform_search(self):
+        # Получаем значения из полей ввода
+        invoice = self.search_invoice.get()
+        product_id = self.search_product_id.get()
+        description = self.search_description.get()
+
+        # Формируем SQL-запрос с учетом введенных параметров
+        query = """
+            SELECT s.invoice, s.product_id, p.product_desc, s.quantity, p.product_price * s.quantity AS total_price, s.date, s.time
+            FROM sales s
+            JOIN products p ON s.product_id = p.product_id
+            WHERE 1=1
+        """
+        params = []
+
+        if invoice:
+            query += " AND s.invoice = ?"
+            params.append(invoice)
+        if product_id:
+            query += " AND s.product_id = ?"
+            params.append(product_id)
+        if description:
+            query += " AND p.product_desc LIKE ?"
+            params.append('%' + description + '%')
+
+        # Выполняем запрос
+        self.cur.execute(query, tuple(params))
+        saleslist = self.cur.fetchall()
+
+        # Очищаем текущую таблицу
+        self.tree.delete(*self.tree.get_children())
+
+        # Заполняем таблицу результатами поиска
+        for i in range(0, len(saleslist)):
+            saleslist[i] = list(saleslist[i])
+            s = (str(saleslist[i][5])).split('-')  # Дата
+            saleslist[i][5] = s[2] + " - " + s[1] + " - " + s[0]
+            saleslist[i] = tuple(saleslist[i])
+
+            self.tree.insert('', 'end', values=(saleslist[i]))
+
+        # Закрываем окно поиска
+        self.search_window.destroy()
+
+    def search_by_description(self):
+        if self.searchvar.get() == '':
             return
         self.tree.delete(*self.tree.get_children())
-        self.cur.execute("SELECT * FROM sales")
+        self.cur.execute("SELECT * FROM sales WHERE product_desc LIKE ?", ('%' + self.searchvar.get() + '%',))
         saleslist = self.cur.fetchall()
         for i in range(0, len(saleslist)):
             saleslist[i] = list(saleslist[i])
@@ -944,150 +1101,5 @@ class Admin:
                 # Если product_info пусто, пропускаем эту запись
                 continue
         for j in saleslist:
-            if (str(j[1]) == str(self.searchvar.get())):
+            if self.searchvar.get().lower() in j[3].lower():  # Проверяем совпадение по описанию
                 self.tree.insert('', 'end', values=(j))
-
-    def search_by_date_range(self):
-        # Создаем новое окно для выбора дат
-        date_window = Toplevel(self.mainw)
-        date_window.title("Выбор даты")
-        date_window.geometry("400x200")
-
-        # Метка для начальной даты
-        Label(date_window, text="Начальная дата:").grid(row=0, column=0, padx=10, pady=10)
-        start_date_entry = DateEntry(date_window, width=12, background='darkblue', foreground='white', borderwidth=2)
-        start_date_entry.grid(row=0, column=1, padx=10, pady=10)
-
-        # Метка для конечной даты
-        Label(date_window, text="Конечная дата:").grid(row=1, column=0, padx=10, pady=10)
-        end_date_entry = DateEntry(date_window, width=12, background='darkblue', foreground='white', borderwidth=2)
-        end_date_entry.grid(row=1, column=1, padx=10, pady=10)
-
-        # Кнопка для подтверждения выбора дат
-        def confirm_dates():
-            start_date = start_date_entry.get_date()
-            end_date = end_date_entry.get_date()
-
-            # Закрываем окно выбора дат
-            date_window.destroy()
-
-            # Выполняем поиск по выбранному диапазону дат
-            self.tree.delete(*self.tree.get_children())
-            self.cur.execute("SELECT * FROM sales WHERE date BETWEEN ? AND ?", (start_date, end_date))
-            saleslist = self.cur.fetchall()
-
-            for i in range(0, len(saleslist)):
-                saleslist[i] = list(saleslist[i])
-                self.cur.execute("SELECT product_desc, product_price FROM products WHERE product_id=?",
-                                 (int(saleslist[i][2]),))
-                l = self.cur.fetchall()
-                if l:
-                    product_desc = l[0][0]
-                    product_price = l[0][1]
-                else:
-                    product_desc = "Unknown"
-                    product_price = 0
-
-                s = (str(saleslist[i][4])).split('-')
-                saleslist[i][4] = s[2] + " - " + s[1] + " - " + s[0]
-
-                if len(saleslist[i]) > 6:
-                    username = saleslist[i][6]
-                else:
-                    username = "Unknown"
-
-                saleslist[i] = [
-                    saleslist[i][0],  # Username
-                    saleslist[i][1],  # Invoice No.
-                    saleslist[i][2],  # Product ID
-                    product_desc,  # Description
-                    saleslist[i][3],  # Quantity
-                    product_price * (int(saleslist[i][3])),  # Total Price
-                    saleslist[i][4],  # Date
-                    saleslist[i][5],  # Time
-                    username  # Username
-                ]
-
-                saleslist[i] = tuple(saleslist[i])
-
-            for i in saleslist:
-                self.tree.insert('', 'end', values=(i))
-
-        # Кнопка для подтверждения
-        Button(date_window, text="Подтвердить", command=confirm_dates).grid(row=2, column=0, columnspan=2, pady=10)
-
-    def search_by_date_range(self):
-        # Создаем новое окно для выбора дат
-        date_window = Toplevel(self.mainw)
-        date_window.title("Выбор даты")
-        date_window.geometry("400x200")
-
-        # Метка для начальной даты
-        Label(date_window, text="Начальная дата:").grid(row=0, column=0, padx=10, pady=10)
-        start_date_entry = DateEntry(date_window, width=12, background='darkblue', foreground='white', borderwidth=2,
-                                     date_pattern="dd.mm.yy")
-        start_date_entry.grid(row=0, column=1, padx=10, pady=10)
-
-        # Метка для конечной даты
-        Label(date_window, text="Конечная дата:").grid(row=1, column=0, padx=10, pady=10)
-        end_date_entry = DateEntry(date_window, width=12, background='darkblue', foreground='white', borderwidth=2,
-                                   date_pattern="dd.mm.yy")
-        end_date_entry.grid(row=1, column=1, padx=10, pady=10)
-
-        # Кнопка для подтверждения выбора дат
-        def confirm_dates():
-            start_date = start_date_entry.get_date()
-            end_date = end_date_entry.get_date()
-
-            # Проверка, что начальная дата не больше конечной
-            if start_date > end_date:
-                messagebox.showerror("Ошибка", "Начальная дата не может быть больше конечной!")
-                return
-
-            # Закрываем окно выбора дат
-            date_window.destroy()
-
-            # Выполняем поиск по выбранному диапазону дат
-            self.tree.delete(*self.tree.get_children())
-            self.cur.execute("SELECT * FROM sales WHERE date BETWEEN ? AND ?", (start_date, end_date))
-            saleslist = self.cur.fetchall()
-
-            for i in range(0, len(saleslist)):
-                saleslist[i] = list(saleslist[i])
-                self.cur.execute("SELECT product_desc, product_price FROM products WHERE product_id=?",
-                                 (int(saleslist[i][2]),))
-                l = self.cur.fetchall()
-                if l:
-                    product_desc = l[0][0]
-                    product_price = l[0][1]
-                else:
-                    product_desc = "Unknown"
-                    product_price = 0
-
-                s = (str(saleslist[i][4])).split('-')
-                saleslist[i][4] = s[2] + " - " + s[1] + " - " + s[0]
-
-                if len(saleslist[i]) > 6:
-                    username = saleslist[i][6]
-                else:
-                    username = "Unknown"
-
-                saleslist[i] = [
-                    saleslist[i][0],  # Username
-                    saleslist[i][1],  # Invoice No.
-                    saleslist[i][2],  # Product ID
-                    product_desc,  # Description
-                    saleslist[i][3],  # Quantity
-                    product_price * (int(saleslist[i][3])),  # Total Price
-                    saleslist[i][4],  # Date
-                    saleslist[i][5],  # Time
-                    username  # Username
-                ]
-
-                saleslist[i] = tuple(saleslist[i])
-
-            for i in saleslist:
-                self.tree.insert('', 'end', values=(i))
-
-        # Кнопка для подтверждения
-        Button(date_window, text="Подтвердить", command=confirm_dates).grid(row=2, column=0, columnspan=2, pady=10)

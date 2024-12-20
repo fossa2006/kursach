@@ -117,40 +117,60 @@ class User:
         self.user_input()
 
     def user_input(self):
-        self.cur.execute('select max(trans_id) from sales')
-        li = self.cur.fetchall()
-        if (li[0][0] != None):
-            self.transid = li[0][0] + 1
+        # Получаем максимальный номер счета-фактуры из базы данных
+        self.cur.execute('SELECT MAX(invoice) FROM sales')
+        result = self.cur.fetchone()
+
+        # Проверяем, есть ли записи в таблице sales
+        if result[0] is None:
+            self.invoice = 1  # Если записей нет, начинаем счета с 1
         else:
-            self.transid = 100
+            self.invoice = result[0] + 1  # Иначе увеличиваем максимальный номер на 1
+
+        # Получаем максимальный номер транзакции (trans_id) из базы данных
+        self.cur.execute('SELECT MAX(trans_id) FROM sales')
+        trans_result = self.cur.fetchone()
+
+        # Проверяем, есть ли записи в таблице sales
+        if trans_result[0] is None:
+            self.transid = 100  # Если записей нет, начинаем транзакции с 100
+        else:
+            self.transid = trans_result[0] + 1  # Иначе увеличиваем максимальный номер на 1
+
         self.qty = StringVar(value=1)
         self.additem = StringVar()
         self.total = IntVar(value=0)
-        Button(self.entryframe, text="Продолжить", command=self.transtableadd, bd=10, width=8, height=7, bg="#FFFFFF", font="roboto 10").place(x=0, y=30)
-        Button(self.entryframe, text="Добавить", command=self.addtotrans, bd=10, width=10, height=3, bg="#FFFFFF", font="roboto 10").place(x=100, y=80)
-        Button(self.entryframe, text="Удалить", command=self.removecart, bd=10, width=10, height=3, bg="#FFFFFF", font="roboto 10").place(x=210, y=80)
+        Button(self.entryframe, text="Продолжить", command=self.transtableadd, bd=10, width=8, height=7, bg="#FFFFFF",
+               font="roboto 10").place(x=0, y=30)
+        Button(self.entryframe, text="Добавить", command=self.addtotrans, bd=10, width=10, height=3, bg="#FFFFFF",
+               font="roboto 10").place(x=100, y=80)
+        Button(self.entryframe, text="Удалить", command=self.removecart, bd=10, width=10, height=3, bg="#FFFFFF",
+               font="roboto 10").place(x=210, y=80)
         entercart = mycombobox(self.entryframe, width=20, textvariable=self.additem, font="roboto 12")
         entercart.place(x=100, y=30, height=30)
         cartqty = Entry(self.entryframe, textvariable=self.qty, width=9, bg="#ffffff", font="roboto 12")
         cartqty.place(x=320, y=30, height=30)
-        carttotal = Entry(self.entryframe, textvariable=self.total, width=20, state='readonly', bg="#ffffff", font="roboto 12")
+        carttotal = Entry(self.entryframe, textvariable=self.total, width=20, state='readonly', bg="#ffffff",
+                          font="roboto 12")
         carttotal.place(x=130, y=185, height=60)
         Label(self.entryframe, text="Количество", font="roboto 12 bold", bg="#ffffff").place(x=318, y=0)
-        Label(self.entryframe, text="Поиск", font="roboto 12 bold", bg="#ffffff").place(x=100, y=0)
+        Label(self.entryframe, text="Поиск", font="roboto 12 bold", bg="#ffffff").place(x=100, y=60)
         Label(self.entryframe, text="общ. сумма", font="roboto 14 bold", bg="#ffffff").place(x=0, y=205)
-        self.cur.execute("select max(invoice) from sales")
-        self.invoice = self.cur.fetchall()
-        self.invoice = self.invoice[0][0] + 1
-        Label(self.tableframe1, text="Номер счета: " + str(self.invoice), font="roboto 14 bold", bg="#ffffff").grid(row=0, column=0)
-        self.cur.execute("select product_desc,product_price from products")
+
+        # Отображаем номер счета-фактуры
+        Label(self.tableframe1, text="Номер счета: " + str(self.invoice), font="roboto 14 bold", bg="#ffffff").grid(
+            row=0, column=0)
+
+        self.cur.execute("SELECT product_desc, product_price FROM products")
         li = self.cur.fetchall()
         self.inventory = []
         self.desc_price = dict()
         for i in range(0, len(li)):
-            if (self.inventory.count(li[i][0]) == 0):
+            if self.inventory.count(li[i][0]) == 0:
                 self.inventory.append(li[i][0])
             self.desc_price[li[i][0]] = li[i][1]
         entercart.set_completion_list(self.inventory)
+
         li = ['ID продукта', 'Имя продукта', 'цена', 'Остаток']
         va = 0
         for i in range(0, 4):
@@ -160,12 +180,16 @@ class User:
         self.cartitem = StringVar()
         self.cartitemprice = StringVar()
         self.cartitemstock = StringVar()
-        Entry(self.entryframe1, textvariable=self.cartitemid, font="roboto 14", bg="#FFFFFF", width=25, state='readonly').place(x=162, y=0, height=40)
-        Entry(self.entryframe1, textvariable=self.cartitem, font="roboto 14", bg="#FFFFFF", width=25, state='readonly').place(x=162, y=65, height=40)
-        Entry(self.entryframe1, textvariable=self.cartitemprice, font="roboto 14", bg="#FFFFFF", width=25, state='readonly').place(x=162, y=65 * 2, height=40)
-        Entry(self.entryframe1, textvariable=self.cartitemstock, font="roboto 14", bg="#FFFFFF", width=25, state='readonly').place(x=162, y=65 * 3, height=40)
+        Entry(self.entryframe1, textvariable=self.cartitemid, font="roboto 14", bg="#FFFFFF", width=25,
+              state='readonly').place(x=162, y=0, height=40)
+        Entry(self.entryframe1, textvariable=self.cartitem, font="roboto 14", bg="#FFFFFF", width=25,
+              state='readonly').place(x=162, y=65, height=40)
+        Entry(self.entryframe1, textvariable=self.cartitemprice, font="roboto 14", bg="#FFFFFF", width=25,
+              state='readonly').place(x=162, y=65 * 2, height=40)
+        Entry(self.entryframe1, textvariable=self.cartitemstock, font="roboto 14", bg="#FFFFFF", width=25,
+              state='readonly').place(x=162, y=65 * 3, height=40)
         self.id_qty = dict()
-        self.cur.execute("select product_id from products")
+        self.cur.execute("SELECT product_id FROM products")
         l = self.cur.fetchall()
         for i in range(0, len(l)):
             self.id_qty[l[i][0]] = 0
@@ -213,43 +237,83 @@ class User:
             self.qty.set('1')
             self.additem.set('')
 
-    def transtableadd(self):
-        x = self.tree.get_children()
-        if (len(x) == 0):
-            messagebox.showerror('Ошибка', 'Корзина пуста!')
-            return
-        if (messagebox.askyesno('Внимание!', 'Вы хотите продолжить?') == False):
-            return
-        a = []
-        self.cur.execute("select max(invoice) from sales")
-        self.invoice = self.cur.fetchall()
-        self.invoice = self.invoice[0][0] + 1
-        for i in x:
-            l = self.tree.item(i)
-            a.append(l['values'])
-        for i in a:
-            s = (str(i[5])).split('-')
-            i[5] = s[2] + "-" + s[1] + "-" + s[0]
-            self.cur.execute("insert into sales values (?,?,?,?,?,?)", (int(i[0]), int(self.invoice), int(i[1]), int(i[3]), i[5], i[6]))
-            self.cur.execute("select stocks from products where product_id=?", (int(i[1]),))
-            l = self.cur.fetchall()
-            self.cur.execute("update products set stocks=? where product_id=?", (l[0][0] - self.id_qty[str(i[1])], int(i[1])))
-            self.base.commit()
-        messagebox.showinfo('Успешно', 'Транзакция успешно завершена!')
-        self.makeprint()
-        self.tree.delete(*self.tree.get_children())
-        self.cartitemstock.set('')
-        self.cartitem.set('')
-        self.cartitemid.set('')
-        self.cartitemprice.set('')
-        self.total.set(0)
-        self.additem.set('')
-        self.qty.set('1')
-        self.cur.execute("select product_id from products")
+    def user_input(self):
+        # Получаем максимальный номер счета-фактуры из базы данных
+        self.cur.execute('SELECT MAX(invoice) FROM sales')
+        result = self.cur.fetchone()
+
+        # Проверяем, есть ли записи в таблице sales
+        if result[0] is None:
+            self.invoice = 1  # Если записей нет, начинаем счета с 1
+        else:
+            self.invoice = result[0] + 1  # Иначе увеличиваем максимальный номер на 1
+
+        # Получаем максимальный номер транзакции (trans_id) из базы данных
+        self.cur.execute('SELECT MAX(trans_id) FROM sales')
+        trans_result = self.cur.fetchone()
+
+        # Проверяем, есть ли записи в таблице sales
+        if trans_result[0] is None:
+            self.transid = 100  # Если записей нет, начинаем транзакции с 100
+        else:
+            self.transid = trans_result[0] + 1  # Иначе увеличиваем максимальный номер на 1
+
+        self.qty = StringVar(value=1)
+        self.additem = StringVar()
+        self.total = IntVar(value=0)
+        Button(self.entryframe, text="Продолжить", command=self.transtableadd, bd=10, width=8, height=7, bg="#FFFFFF",
+               font="roboto 10").place(x=0, y=30)
+        Button(self.entryframe, text="Добавить", command=self.addtotrans, bd=10, width=10, height=3, bg="#FFFFFF",
+               font="roboto 10").place(x=100, y=80)
+        Button(self.entryframe, text="Удалить", command=self.removecart, bd=10, width=10, height=3, bg="#FFFFFF",
+               font="roboto 10").place(x=210, y=80)
+        entercart = mycombobox(self.entryframe, width=20, textvariable=self.additem, font="roboto 12")
+        entercart.place(x=100, y=30, height=30)
+        cartqty = Entry(self.entryframe, textvariable=self.qty, width=9, bg="#ffffff", font="roboto 12")
+        cartqty.place(x=320, y=30, height=30)
+        carttotal = Entry(self.entryframe, textvariable=self.total, width=20, state='readonly', bg="#ffffff",
+                          font="roboto 12")
+        carttotal.place(x=130, y=185, height=60)
+        Label(self.entryframe, text="Количество", font="roboto 12 bold", bg="#ffffff").place(x=318, y=0)
+        Label(self.entryframe, text="Поиск", font="roboto 12 bold", bg="#ffffff").place(x=100, y=0)
+        Label(self.entryframe, text="общ. сумма", font="roboto 14 bold", bg="#ffffff").place(x=0, y=205)
+
+        # Отображаем номер счета-фактуры
+        Label(self.tableframe1, text="Номер счета: " + str(self.invoice), font="roboto 14 bold", bg="#ffffff").grid(
+            row=0, column=0)
+
+        self.cur.execute("SELECT product_desc, product_price FROM products")
+        li = self.cur.fetchall()
+        self.inventory = []
+        self.desc_price = dict()
+        for i in range(0, len(li)):
+            if self.inventory.count(li[i][0]) == 0:
+                self.inventory.append(li[i][0])
+            self.desc_price[li[i][0]] = li[i][1]
+        entercart.set_completion_list(self.inventory)
+
+        li = ['ID продукта', 'Имя продукта', 'цена', 'Остаток']
+        va = 0
+        for i in range(0, 4):
+            Label(self.entryframe1, text=li[i], font="roboto 14 bold", bg="#FFFFFF").place(x=0, y=va)
+            va += 65
+        self.cartitemid = StringVar()
+        self.cartitem = StringVar()
+        self.cartitemprice = StringVar()
+        self.cartitemstock = StringVar()
+        Entry(self.entryframe1, textvariable=self.cartitemid, font="roboto 14", bg="#FFFFFF", width=25,
+              state='readonly').place(x=162, y=0, height=40)
+        Entry(self.entryframe1, textvariable=self.cartitem, font="roboto 14", bg="#FFFFFF", width=25,
+              state='readonly').place(x=162, y=65, height=40)
+        Entry(self.entryframe1, textvariable=self.cartitemprice, font="roboto 14", bg="#FFFFFF", width=25,
+              state='readonly').place(x=162, y=65 * 2, height=40)
+        Entry(self.entryframe1, textvariable=self.cartitemstock, font="roboto 14", bg="#FFFFFF", width=25,
+              state='readonly').place(x=162, y=65 * 3, height=40)
+        self.id_qty = dict()
+        self.cur.execute("SELECT product_id FROM products")
         l = self.cur.fetchall()
         for i in range(0, len(l)):
             self.id_qty[l[i][0]] = 0
-        self.make_invoice()
 
     def removecart(self):
         re = self.tree.selection()
@@ -319,3 +383,53 @@ class User:
             li = self.cur.fetchall()
             self.cartitemprice.set(li[0][0])
             self.cartitemstock.set(li[0][1] - self.id_qty[self.cartitemid.get()])
+
+    def transtableadd(self):
+        x = self.tree.get_children()
+        if len(x) == 0:
+            messagebox.showerror('Ошибка', 'Корзина пуста!')
+            return
+        if messagebox.askyesno('Внимание!', 'Вы хотите продолжить?') == False:
+            return
+
+        a = []
+        # Получаем максимальный номер счета-фактуры из базы данных
+        self.cur.execute("SELECT MAX(invoice) FROM sales")
+        result = self.cur.fetchone()
+
+        # Проверяем, есть ли записи в таблице sales
+        if result[0] is None:
+            self.invoice = 1  # Если записей нет, начинаем счета с 1
+        else:
+            self.invoice = result[0] + 1  # Иначе увеличиваем максимальный номер на 1
+
+        for i in x:
+            l = self.tree.item(i)
+            a.append(l['values'])
+
+        for i in a:
+            s = (str(i[5])).split('-')
+            i[5] = s[2] + "-" + s[1] + "-" + s[0]
+            self.cur.execute("INSERT INTO sales VALUES (?,?,?,?,?,?)",
+                             (int(i[0]), int(self.invoice), int(i[1]), int(i[3]), i[5], i[6]))
+            self.cur.execute("SELECT stocks FROM products WHERE product_id=?", (int(i[1]),))
+            l = self.cur.fetchall()
+            self.cur.execute("UPDATE products SET stocks=? WHERE product_id=?",
+                             (l[0][0] - self.id_qty[str(i[1])], int(i[1])))
+            self.base.commit()
+
+        messagebox.showinfo('Успешно', 'Транзакция успешно завершена!')
+        self.makeprint()
+        self.tree.delete(*self.tree.get_children())
+        self.cartitemstock.set('')
+        self.cartitem.set('')
+        self.cartitemid.set('')
+        self.cartitemprice.set('')
+        self.total.set(0)
+        self.additem.set('')
+        self.qty.set('1')
+        self.cur.execute("SELECT product_id FROM products")
+        l = self.cur.fetchall()
+        for i in range(0, len(l)):
+            self.id_qty[l[i][0]] = 0
+        self.make_invoice()
